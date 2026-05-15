@@ -1,0 +1,42 @@
+# colors-legacy.txt
+# Paleta extraída del HTML actual de mnconsultoria.org (legacy)
+# Verificada por inspección directa del CSS :root + uso en clases Tailwind
+# Fecha: 2026-05-15
+
+# === Colores corporativos (mantener, son la identidad MNARANJO) ===
+PRIMARY_TEAL=#008080
+SECONDARY_ORANGE=#ff8c00
+
+# === Variantes derivadas usadas en el legacy ===
+TEAL_HOVER=#006666           /* btn-primary:hover */
+ORANGE_HOVER=#e67a00         /* btn-secondary:hover */
+ORANGE_400=#fb923c           /* text-orange-400 (Tailwind) — usado en h3 sección contacto */
+ORANGE_500=#f97316           /* text-orange-500, bg-orange-500 (Tailwind) — usado en hero */
+
+# === Tonos teal extendidos (de las clases Tailwind del legacy) ===
+TEAL_300=#5eead4             /* text-teal-300 en footer */
+TEAL_600=#0d9488             /* bg-teal-600 botones */
+TEAL_700=#0f766e             /* text-teal-700 títulos h3 cards */
+
+# === Neutros ===
+TEXT=#333333
+BACKGROUND=#f8f8f8
+LIGHT_GRAY=#eeeeee
+DARK_GRAY=#666666
+SECTION_DARK=#111827         /* bg-gray-900 sección "Iniciemos la transformación" */
+
+# === Decisión para Astro/Tailwind v4 ===
+# Mapear estos colores a tokens semánticos, no a tonos directos:
+# - brand-primary    -> #008080
+# - brand-accent     -> #ff8c00
+# - brand-primary-hover  -> #006666
+# - brand-accent-hover   -> #e67a00
+# - surface-default  -> #f8f8f8
+# - surface-elevated -> #ffffff
+# - surface-dark     -> #111827
+# - text-default     -> #333333
+# - text-muted       -> #666666
+# - border-subtle    -> #eeeeee
+#
+# Que la skill frontend-design proponga una escala 50-950 para 
+# brand-primary y brand-accent partiendo de los valores base de arriba.

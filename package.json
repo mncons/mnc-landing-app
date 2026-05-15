@@ -1,0 +1,31 @@
+{
+  "name": "mnc-landing-app",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Landing y verticales MNC Consultoria - MNconsultor.IA (TM)",
+  "engines": {
+    "node": ">=22.0.0 <23.0.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "fonts:subset": "bash scripts/fonts-subset.sh"
+  },
+  "dependencies": {
+    "@lucide/astro": "^1.16.0",
+    "@tailwindcss/vite": "^4.3.0",
+    "astro": "^6.3.3",
+    "tailwindcss": "^4.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "glyphhanger": "^5.0.0",
+    "prettier": "^3.8.3",
+    "prettier-plugin-astro": "^0.14.1",
+    "prettier-plugin-tailwindcss": "^0.8.0",
+    "wrangler": "^4.92.0"
+  }
+}

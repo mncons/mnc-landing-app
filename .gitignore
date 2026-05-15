@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# build outputs
+dist/
+.astro/
+
+# cloudflare workers
+.wrangler/
+.dev.vars
+
+# env
+.env
+.env.*
+!.env.example
+
+# fonts staging (intermediate .otf during subset)
+.fonts-source/
+
+# misc
+.DS_Store
+*.log
+*.tmp
+.vscode/
+.idea/
