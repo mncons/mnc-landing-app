@@ -6,9 +6,9 @@
 
 ## Contexto
 
-Reconstrucción desde cero de `mnconsultoria.org` con SDD estricto. Esta sesión cubre el **primer lote del kickoff**: repo, scaffold Astro 5, brand assets, fuentes self-hosted, dirección estética vía skill `frontend-design`, tokens Tailwind v4, README con security baseline §14, primer commit semántico. El **segundo lote** (Base.astro + ContactForm + Pages Function + Worker `lead-to-odoo` + smoke test contra Odoo real) queda planteado al final y se aprueba aparte, con diagrama ASCII de por medio.
+Reconstrucción desde cero de `mnconsultoria.org` con SDD estricto. Esta sesión cubre el **primer lote del kickoff**: repo, scaffold Astro 6.3.3, brand assets, fuentes self-hosted, dirección estética vía skill `frontend-design`, tokens Tailwind v4, README con security baseline §14, primer commit semántico. El **segundo lote** (Base.astro + ContactForm + Pages Function + Worker `lead-to-odoo` + smoke test contra Odoo real) queda planteado al final y se aprueba aparte, con diagrama ASCII de por medio.
 
-Decisiones cerradas (no se debaten en este plan): Astro 5 + Tailwind v4 (Vite) + pnpm + Cloudflare Pages + Worker `lead-to-odoo` + Odoo Enterprise online (`https://mnaranjo.odoo.com`) + GoatCounter cloud + DIN 2014 Narrow self-hosted + `@lucide/astro` + paleta `#008080` teal / `#ff8c00` naranja. Wordmark `MNC Consultoría · MNconsultor.IA™`. Domino.IA SOLO en `/sobre#proyectos-en-desarrollo`. Footer `© 2026 MNARANJO Consultoría SAS · NIT [TBD] · Bogotá, Colombia`.
+Decisiones cerradas (no se debaten en este plan): Astro 6.3.3 + Tailwind v4 (Vite) + pnpm + Cloudflare Pages + Worker `lead-to-odoo` + Odoo Enterprise online (`https://mnaranjo.odoo.com`) + GoatCounter cloud + DIN 2014 Narrow self-hosted + `@lucide/astro` + paleta `#008080` teal / `#ff8c00` naranja. Wordmark `MNC Consultoría · MNconsultor.IA™`. Domino.IA SOLO en `/sobre#proyectos-en-desarrollo`. Footer `© 2026 MNARANJO Consultoría SAS · NIT [TBD] · Bogotá, Colombia`.
 
 Autoridad de docs: `mnc-landing-spec-v3.md` > `spec-v3-addendum.md` > `artefactos-clasificacion.md` > `legal-marcas-v2.md` > `MNC_Contexto_Referencia_2026Q2.md` > `brand-notes-v2.md`.
 
@@ -99,7 +99,7 @@ pip install --user --upgrade fonttools brotli zopfli
 - **Archivos**: ninguno en repo.
 - **Done**: `wrangler --version` ≥ 3, `glyphhanger --version` responde, `pyftsubset --help | head -1` responde.
 
-#### Paso 3 · Scaffold Astro 5 + Tailwind v4 + `@lucide/astro`
+#### Paso 3 · Scaffold Astro 6.3.3 + Tailwind v4 + `@lucide/astro`
 
 ```bash
 cd ~/projects/mnc-landing-app
@@ -244,7 +244,7 @@ Tokens base (de `colors-legacy.txt`, mapeados a CSS vars Tailwind v4):
 Secciones del README:
 
 1. Wordmark + descripción del proyecto (1 párrafo)
-2. **Stack**: Astro 5, Tailwind v4, Cloudflare Pages, Worker `lead-to-odoo`, Odoo Enterprise online, GoatCounter, DIN 2014 Narrow self-hosted, `@lucide/astro`
+2. **Stack**: Astro 6.3.3, Tailwind v4, Cloudflare Pages, Worker `lead-to-odoo`, Odoo Enterprise online, GoatCounter, DIN 2014 Narrow self-hosted, `@lucide/astro`
 3. **Comandos**: `pnpm dev`, `pnpm build`, `pnpm preview`, `pnpm wrangler dev` (worker), `pnpm fonts:subset` (script glyphhanger)
 4. **Estructura**: `src/pages/`, `src/components/islands/`, `src/content/`, `src/layouts/`, `src/styles/`, `workers/lead-to-odoo/`, `public/brand/`, `functions/api/`
 5. **Security baseline §14** (checklist):
@@ -297,7 +297,7 @@ updates:
 cd ~/projects/mnc-landing-app
 git add -A
 git status                                  # revisar manualmente antes
-git commit -m "feat: scaffold astro 5 + tailwind v4 + brand assets + security baseline"
+git commit -m "feat: scaffold astro 6.3.3 + tailwind v4 + brand assets + security baseline"
 git push -u origin main
 ```
 
