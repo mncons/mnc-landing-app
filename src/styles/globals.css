@@ -1,1 +1,170 @@
 @import "tailwindcss";
+
+/* ============================================================
+   Design tokens — fuente: design-direction.md (aprobado 2026-05-15)
+   Tailwind v4 deriva utilities desde estos @theme custom properties:
+     --color-X     -> bg-X / text-X / border-X / ring-X / fill-X / stroke-X
+     --spacing     -> p-N / gap-N / m-N (N x --spacing)
+     --radius-X    -> rounded-X
+     --shadow-X    -> shadow-X
+     --duration-X  -> duration-X
+     --ease-X      -> ease-X
+     --breakpoint-X -> sm: md: lg: xl:
+     --font-X      -> font-X
+   ============================================================ */
+
+@theme {
+  /* ---- Color tokens (paleta MNARANJO + neutrales) ---- */
+  --color-primary:          #008080;
+  --color-primary-hover:    #006666;
+  --color-primary-300:      #5eead4;
+  --color-primary-600:      #0d9488;
+  --color-primary-700:      #0f766e;
+
+  --color-accent:           #ff8c00;
+  --color-accent-hover:     #e67a00;
+  --color-accent-400:       #fb923c;
+  --color-accent-500:       #f97316;
+
+  --color-text:             #333333;
+  --color-text-muted:       #666666;
+
+  --color-surface:          #f8f8f8;
+  --color-surface-elevated: #ffffff;
+  --color-surface-dark:     #111827;
+
+  --color-border:           #eeeeee;
+
+  /* ---- Spacing base 4 px (Tailwind v4 deriva p-1=4 p-2=8 p-24=96, etc.) ---- */
+  --spacing: 0.25rem;
+
+  /* ---- Radii (solo 2 px y 4 px efectivos; aliases bloquean escalado) ---- */
+  --radius-sm:  2px;
+  --radius:     4px;
+  --radius-md:  4px;
+  --radius-lg:  4px;
+  --radius-xl:  4px;
+  --radius-2xl: 4px;
+  --radius-3xl: 4px;
+
+  /* ---- Shadows (una sola sombra real; aliases bloquean Material-style stacks) ---- */
+  --shadow-none: none;
+  --shadow-sm:   0 1px 0 rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  --shadow:      0 1px 0 rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  --shadow-md:   0 1px 0 rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  --shadow-lg:   0 1px 0 rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  --shadow-xl:   0 1px 0 rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  --shadow-2xl:  0 1px 0 rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.06);
+
+  /* ---- Motion (1 curva, 3 duraciones) ---- */
+  --ease-out-quart: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast:  120ms;
+  --duration-base:  240ms;
+  --duration-slow:  400ms;
+
+  /* ---- Breakpoints (sin 2xl deliberadamente) ---- */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+
+  /* Container clamps (max-w-screen-xl tope incluso si llega un 2xl heredado) */
+  --container-md:  768px;
+  --container-lg:  1024px;
+  --container-xl:  1280px;
+  --container-2xl: 1280px;
+
+  /* ---- Typography ---- */
+  --font-sans: "DIN 2014 Narrow", "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
+}
+
+/* ============================================================
+   @font-face — DIN 2014 Narrow self-hosted (4 pesos)
+   Subset latin + latin-ext + puntuacion MNC (· — – ™ ® © « » ¿ ¡ €)
+   font-display: swap en los 4 (fallback visible inmediato, swap al cargar)
+   ============================================================ */
+
+@font-face {
+  font-family: "DIN 2014 Narrow";
+  src: url("/brand/fonts/din-2014-narrow-200.woff2") format("woff2");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0100-017F, U+0131, U+0152-0153,
+    U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+2000-206F, U+2013-2014, U+2074, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "DIN 2014 Narrow";
+  src: url("/brand/fonts/din-2014-narrow-300.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0100-017F, U+0131, U+0152-0153,
+    U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+2000-206F, U+2013-2014, U+2074, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "DIN 2014 Narrow";
+  src: url("/brand/fonts/din-2014-narrow-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0100-017F, U+0131, U+0152-0153,
+    U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+2000-206F, U+2013-2014, U+2074, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "DIN 2014 Narrow";
+  src: url("/brand/fonts/din-2014-narrow-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0100-017F, U+0131, U+0152-0153,
+    U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+2000-206F, U+2013-2014, U+2074, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+/* ============================================================
+   Base layer — defaults document-level
+   ============================================================ */
+
+@layer base {
+  body {
+    background-color: var(--color-surface-elevated);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* ============================================================
+   Reduced motion — accesibilidad no-negociable
+   Neutraliza las 3 motion durations cuando el SO lo pide.
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0ms !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
