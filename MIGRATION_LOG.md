@@ -1,0 +1,178 @@
+# MIGRATION_LOG
+
+Registro de migración de artefactos del legacy a `mnc-landing-app` + decisiones técnicas tomadas durante la reconstrucción + riesgos conocidos pendientes.
+
+---
+
+## Tabla de migración de artefactos
+
+> Una fila por artefacto del `~/projects/mnc-landing/_legacy/` cuando se integre. Lote 1 NO migra ninguno — solo deja la tabla preparada.
+
+| Fecha | Origen (`_legacy/`) | Destino (`src/`) | Bucket | Ajustes aplicados | Decisiones | Estado |
+|---|---|---|---|---|---|---|
+
+---
+
+## Decisiones técnicas — lote 1
+
+### 1. `pyftsubset` directo en lugar de `glyphhanger` CLI
+
+**Contexto:** `spec-v3-addendum.md` y el plan original mencionaban `glyphhanger` (envoltorio Node sobre `pyftsubset`) para convertir DIN 2014 Narrow `.otf` → `.woff2` con subset.
+
+**Decisión:** usar `pyftsubset` directo desde `scripts/fonts-subset.sh`.
+
+**Razones:**
+1. `glyphhanger` CLI agrega capa de abstracción sobre `pyftsubset` sin valor real — terminamos pasándole los mismos flags Unicode.
+2. Menos dependencias en `devDependencies` (glyphhanger sigue listado por `pnpm fonts:subset` legacy, pero el script no lo invoca — pendiente removerlo en lote 2 cuando esté validado el flujo).
+3. Mejor control del `--unicodes` (subset latin + latin-ext + puntuación MNC explícita) y de `--layout-features`.
+4. Si se pierde la red, `glyphhanger` necesita resolver paquetes Node; `pyftsubset` es puro Python local.
+
+**Implementación:** `scripts/fonts-subset.sh` (commiteado en `feat(lote-1): Astro 6 scaffold...`). Comando equivalente:
+```bash
+pyftsubset din-2014-narrow-{variant}.otf \
+  --output-file=public/brand/fonts/din-2014-narrow-{weight}.woff2 \
+  --flavor=woff2 \
+  --unicodes="U+0000-00FF,U+0100-017F,U+0131,...,U+FFFD" \
+  --layout-features='*' \
+  --no-hinting
+```
+
+**Pre-requisito sistema:** `apt install python3-fonttools python3-brotli`.
+
+**Acción Ola 1.5:** quitar `glyphhanger` de `devDependencies` cuando el script esté en CI verde.
+
+---
+
+### 2. NO crear `tailwind.config.ts`
+
+**Contexto:** convención Tailwind v3 era declarar tokens en `tailwind.config.ts`. Tailwind v4 cambió a leer tokens desde `@theme` en CSS.
+
+**Decisión:** no crear `tailwind.config.ts`. Todo el design system vive en `src/styles/globals.css` bloque `@theme`.
+
+**Razones:**
+1. `design-direction.md §"Cómo se traduce a tailwind.config.ts y globals.css"` lo dice literal: *"Tailwind v4 lee `@theme` desde CSS, así que el config queda mínimo (sólo `content` globs si es necesario). En Astro 6 + `@tailwindcss/vite`, ni siquiera hace falta el config TS"*.
+2. Un archivo de config TS vacío o casi vacío introduce ruido y un segundo lugar donde buscar tokens.
+3. Astro 6 + `@tailwindcss/vite` v4 hace tree-shaking de utilities automáticamente sin necesidad de `content` globs explícitos.
+
+**Re-evaluación cuando:** si se agrega un plugin Tailwind que requiera config TS (typography, forms, etc.). Por ahora no se ven candidatos.
+
+---
+
+### 3. `globals.css` (plural) en lugar de `global.css` (singular)
+
+**Contexto:** Astro CLI 6 crea `src/styles/global.css` por default. Spec v3 §4, `design-direction.md` (×3 menciones) y `plan.md` Paso 7 (×4 menciones) usan `globals.css` (plural).
+
+**Decisión:** renombrar a `globals.css` (plural).
+
+**Razones:**
+1. Consistencia con 4 fuentes de autoridad del proyecto.
+2. Convención Next.js App Router + Tailwind v4 docs.
+3. Cambio una sola vez al inicio cuesta menos que dejar drift entre código y docs durante toda la Ola 1.
+
+**Aplicación:** `git mv src/styles/global.css src/styles/globals.css` (commit A). Astro tree-shaking y Vite picks up el archivo por import, no por convención de nombre — sin impacto en bundling.
+
+---
+
+### 4. Favicons con padding centrado + canvas cuadrado (Opción A)
+
+**Bug detectado:** `public/brand/logo/USAGE.md` ll. 92-105 indica:
+```bash
+convert mn-symbol-transparent.png -resize 16x16 favicon-16.png
+convert mn-symbol-transparent.png -resize 32x32 favicon-32.png
+convert mn-symbol-centered.png -resize 180x180 apple-touch-icon.png
+```
+
+Pero los assets origen NO son cuadrados:
+- `mn-symbol-transparent.png` = **62×73** (ratio 0.85)
+- `mn-symbol-centered.png` = **280×325** (ratio 0.86, a pesar del nombre)
+- `mn-symbol.png` = 204×240
+
+El comando literal produce favicons rectangulares (14×16, 27×32, 155×180) que los navegadores deforman al renderizar.
+
+**Decisión (Opción A):** mantener proporciones del símbolo + agregar padding hasta llegar al canvas cuadrado.
+- `favicon-16` / `favicon-32`: fondo **transparente** (`-background none -alpha set`).
+- `apple-touch-icon` (180×180): fondo **blanco opaco** (`-background "#ffffff" -alpha remove -alpha off`). iOS recorta esquinas y aplica radio propio sobre cualquier wallpaper — blanco se ve más limpio que teal o transparente.
+
+Comandos aplicados:
+```bash
+convert mn-symbol-transparent.png \
+  -resize 16x16 -background none -gravity center -extent 16x16 \
+  favicon-16.png
+
+convert mn-symbol-transparent.png \
+  -resize 32x32 -background none -gravity center -extent 32x32 \
+  favicon-32.png
+
+convert mn-symbol-centered.png \
+  -resize 180x180 -background "#ffffff" -alpha remove -alpha off \
+  -gravity center -extent 180x180 \
+  apple-touch-icon.png
+```
+
+**Verificado:** `identify` confirma 16×16, 32×32, 180×180.
+
+**Alternativas evaluadas y descartadas:**
+- **Opción B (forzar `!`)**: deforma el símbolo ~17% horizontal. Inaceptable visualmente.
+- **Opción C (asset cuadrado nuevo `mn-symbol-square.png`)**: mejor solución de raíz pero agrega archivo al brand kit y obliga a editar `USAGE.md`. Diferido a Ola 1.5.
+
+**Acción pendiente:** actualizar `USAGE.md` (TODO Ola 1.5) — o reemplazar los assets origen por versiones cuadradas, lo que sea más simple cuando se haga la auditoría del brand kit completo.
+
+---
+
+### 5. Pesos de fuente en preload — solo 400 y 700
+
+**Decisión:** `Base.astro` preloadea **dos** pesos:
+- `din-2014-narrow-400.woff2` (body — uso masivo)
+- `din-2014-narrow-700.woff2` (H1, LCP element)
+
+**NO** se preloadean:
+- `din-2014-narrow-300.woff2` (Light — usos puntuales: captions, metadata)
+- `din-2014-narrow-200.woff2` (ExtraLight — uso decorativo limitado, ver `brand-notes-v2.md` advertencia contraste WCAG)
+
+**Razón:** preloadear todo el set anula la ventaja del unicode-range subset y consume ancho de banda en first paint para fuentes que no se usan above-the-fold. El navegador carga 300 y 200 on-demand cuando algún elemento las pide.
+
+**Verificación:** DevTools Network al cargar `index.astro` debe mostrar:
+- 2 `.woff2` con `Initiator: preload` (400 y 700)
+- 1 `.woff2` cargado por el `<p class="font-light">` del smoke test (peso 300)
+- 0 cargas del peso 200 (no se usa en `index.astro`)
+
+---
+
+### 6. Licencia DIN 2014 Narrow — riesgo bajo aceptado Ola 1
+
+**Contexto:** `brand-notes-v2.md §"Caveat legal sobre las fuentes"` advierte que la licencia OTF desktop típica NO cubre uso web `@font-face` self-hosted.
+
+**Decisión Ola 1:** aceptar el riesgo. Tráfico inicial mínimo, auditoría improbable.
+
+**Decisión Ola 2** (cuando tráfico crezca o llegue cliente que exija compliance):
+- **Vía A:** comprar licencia web de DIN 2014 Narrow (~$200-400 USD una vez, Paramount Type Co.).
+- **Vía B:** sustituir por **Barlow Condensed** (Google Fonts, licencia OFL/MIT, visualmente ~85% similar). Cambio en `@font-face` + actualización de `brand-notes-v2.md`.
+
+---
+
+## Riesgos conocidos pendientes (no resueltos en lote 1)
+
+### R1. GloWealth.html mencionado en `artefactos-clasificacion.md` D1 pero ausente en `_legacy/`
+
+`artefactos-clasificacion.md §D1` dice: *"`GloWealth.html` es el mismo código TSX pero con extensión HTML errada. Confirmar y descartar uno."* — el archivo `.html` NO existe en `~/projects/mnc-landing/_legacy/bucket-d-insights/`. Solo está el `.tsx`. **Confirmado descartado** en auditoría implícita; queda esta nota para que la próxima sesión no lo busque.
+
+### R2. `_html-legacy/contact.html.html` y `_html-legacy/index.html` sin clasificar
+
+Estos dos archivos están en `_legacy/_html-legacy/` y NO aparecen en `artefactos-clasificacion.md`. El `index.html` parece ser el C2 (template diagnóstico cliente) pero el doc lo ubica en `bucket-c-internal/`. Auditoría pendiente Ola 1.5 antes de tocar cualquiera de los dos.
+
+### R3. Bucket D blockers de datos
+
+- **D3 `harmony-evolution-dashboard.tsx`**: datos "simulados basados en indicadores reales y estimaciones" sin fuente verificable. Mitigación Ola 1.5: reemplazar con HDI + World Happiness Report + Global Innovation Index, O degradar a Bucket E.
+- **D5 `production-factors-visualization.tsx`**: usa `Math.random()` con patrones realistas. Si se publica como está, lector atento detecta datos falsos y pierde credibilidad. Mitigación Ola 1.5: reescribir como simulador educativo controlado por el usuario, O degradar a Bucket E.
+
+### R4. Engram resolución de proyecto
+
+`mem_save` en cwd `~/projects/` falla con `ambiguous project: multiple git repos found in cwd`. Workaround mientras dure el lote 1: ejecutar saves con `cd ~/projects/mnc-landing-app/` y proyecto explícito. Diferido: investigar si la config de Engram acepta una raíz por defecto que evite el lookup ambiguo.
+
+### R5. spec-v3-addendum.md no commiteado al repo
+
+Los 5 docs de autoridad viven en `~/projects/mnc-landing/` (privado), NO en este repo. Cualquier cambio a esos docs no genera trazabilidad git en `mnc-landing-app`. **Decisión Ola 2:** o (a) mover esos docs al repo en una carpeta `docs/` privada, o (b) crear un repo `mnc-landing-docs` separado con `gh repo create --private`. Por ahora la trazabilidad real está en este `MIGRATION_LOG.md` cuando cambian las decisiones.
+
+---
+
+**Última revisión:** 2026-05-15

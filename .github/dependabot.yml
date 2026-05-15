@@ -1,0 +1,51 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "America/Bogota"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    labels:
+      - "dependencies"
+      - "npm"
+    groups:
+      astro-ecosystem:
+        patterns:
+          - "astro"
+          - "@astrojs/*"
+          - "@tailwindcss/*"
+          - "tailwindcss"
+      lucide:
+        patterns:
+          - "@lucide/*"
+          - "lucide-*"
+      cloudflare:
+        patterns:
+          - "wrangler"
+          - "@cloudflare/*"
+      dev-tooling:
+        patterns:
+          - "prettier"
+          - "prettier-plugin-*"
+          - "@types/*"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "America/Bogota"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(ci)"
+      include: scope
+    labels:
+      - "dependencies"
+      - "github-actions"
