@@ -33,7 +33,56 @@ Registro de migración de artefactos del legacy a `mnc-landing-app` + decisiones
 
 **Bloqueo declarado:** sub-lote 2.B no se inicia hasta que el user devuelva la salida YAML del script con todos los IDs ≠ `MISSING`.
 
-**Rotación API key:** declarada cada 90 días en `ODOO_SETUP.md §4`. Próxima rotación: 2026-08-06 (7 días antes del vencimiento si setup ejecutado 2026-05-15).
+**Rotación API key:** declarada cada 90 días en `ODOO_SETUP.md §4`. Próxima rotación: 2026-08-06 (7 días antes del vencimiento si setup ejecutado 2026-05-15). Ver decisión #8 — la rotación real quedó en 180 días por confort operativo del user.
+
+---
+
+### 8. Delta entre `ODOO_SETUP.md` propuesto y setup real ejecutado (2026-05-15)
+
+**Contexto:** el doc inicial del 2.A asumía valores placeholder (`mnaranjo.odoo.com`, `mnaranjo` DB, team `Web`, 7 sectores). El user ejecutó el setup real contra su instancia Odoo Enterprise online y reportó 10 diferencias concretas + 2 IDs faltantes. Este sub-lote (`2.A.1`) ajusta script + doc + schema para reflejar la realidad y queda como referencia para futuras rotaciones.
+
+**Los 10 puntos del delta:**
+
+| # | Asumido en doc inicial | Realidad en `mnconsultoria.odoo.com` | Impacto |
+|---|---|---|---|
+| 1 | URL `https://mnaranjo.odoo.com` | `https://mnconsultoria.odoo.com` | `ODOO_URL` cambia |
+| 2 | DB `mnaranjo` | `mnconsultoria` | `ODOO_DB` cambia |
+| 3 | Team `Web` (crear nuevo) | `Sitio web` con espacio (re-usar existente — user único pago, evitar fragmentar pipeline) | `crm.team.search_read` query y secret name. Smoke `2.A.1` ajusta search a `('name','=','Sitio web')` |
+| 4 | Alias team optional | `leads@mnconsultoria.org` configurado en el team `Sitio web` | OK, sin código que tocar |
+| 5 | 7 sectores | 8 sectores (`manufactura` agregado) | `expected_tags` del smoke + `TAG_SECTORS` JSON + Zod schema enum sector en 2.B |
+| 6 | UTM source con guion `-` | Guion largo `—` (em-dash, U+2014) confirmado | Script ya buscaba con `ilike "Web"` — funciona. Documentado |
+| 7 | 2FA opcional | **Enforced** por Odoo Enterprise online para crear API keys vía modal | Documentado como pre-requisito. NO desactivar 2FA |
+| 8 | Opción A vs B (recomendaba B) | Opción B aplicada (`leads@` como follower del team `Sitio web` con suscripciones completas) | Documentado como aplicado |
+| 9 | Email-to-Lead (IMAP) ambiguo | **NO configurado.** Alias funciona como outbound (follower) pero NO captura emails entrantes como `crm.lead`. Diferido a Ola 2 (riesgo de secrets IMAP) | Documentado como TODO Ola 2 |
+| 10 | Plantilla custom recomendada | Plantilla `Nuevo Lead · {{object.name}}` **creada pero NO asociada a automatización**. Artefacto disponible si Ola 2 cambia a Opción A | Documentado como artefacto Ola 2 |
+
+**IDs reales recibidos (smoke ejecutado 2026-05-15):**
+
+```yaml
+TAG_WEB:        "4"
+TAG_DOMAIN:     "5"
+TAG_SMOKE:      "6"
+TAG_SECTORS:    '{"horeca":7,"agroindustria":8,"retail":9,"servicios-profesionales":10,"agencias":11,"bpm":12,"marketplace":13}'
+UTM_SOURCE_WEB: "20"
+USER_SUPER_MN:  "2"
+
+# Pendiente re-ejecución smoke tras ajustes 2.A.1:
+TEAM_WEB:                  ID del team "Sitio web"
+TAG_SECTORS.manufactura:   ID del tag "sector-manufactura"
+```
+
+**API key real:**
+- Nombre: `Landing` (única dedicada al Worker, scope CRM por permisos del super-user)
+- Vence: **2026-11-11** (180 días, no 90 — el user eligió duración default de Odoo por confort operativo)
+- Próxima rotación calendarizada: **2026-11-04** (7 días antes)
+- Almacenamiento: Bitwarden Premium (vault personal del super-user MN)
+
+**Acción inmediata tras este sub-lote:** el user re-corre `./tests/odoo-smoke.sh` y devuelve los 2 IDs pendientes (`TEAM_WEB` real + `TAG_SECTORS.manufactura`). Recién entonces arranca 2.B con todos los IDs en mano.
+
+**Lecciones aprendidas (para próximas iteraciones SDD):**
+1. **Documentos con placeholders explícitos** (e.g. `mnaranjo` ← reemplazar con dato real) son riesgosos cuando se confunde el placeholder con el dato real. Marcar `{{ }}` o `<TODO>` en el siguiente doc.
+2. **Setup manual fuera del repo** introduce drift entre lo documentado y lo real. El smoke script captura los IDs reales y los expone — patrón correcto: "el código de verificación es la fuente de verdad, el doc es guía".
+3. **El bloqueo intencional funcionó**: detectamos las 10 diferencias en minutos, no después de horas de Worker code que asumía la versión incorrecta.
 
 ---
 

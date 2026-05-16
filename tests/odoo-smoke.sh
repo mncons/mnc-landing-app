@@ -41,8 +41,8 @@ Flags:
   -h, --help           Esta ayuda.
 
 Variables requeridas (en .dev.vars o exportadas):
-  ODOO_URL       https://mnaranjo.odoo.com
-  ODOO_DB        mnaranjo
+  ODOO_URL       https://mnconsultoria.odoo.com
+  ODOO_DB        mnconsultoria
   ODOO_USER      info@mnconsultoria.org   (login del super-user MN)
   ODOO_API_KEY   <key generada en Mi Perfil → Cuenta → API Keys>
 
@@ -138,6 +138,7 @@ expected_tags = [
     'sector-agencias',
     'sector-bpm',
     'sector-marketplace',
+    'sector-manufactura',
 ]
 tags = query('crm.tag', 'search_read',
              [[('name', 'in', expected_tags)]],
@@ -146,8 +147,10 @@ tag_by_name = {t['name']: t['id'] for t in tags}
 missing_tags = [t for t in expected_tags if t not in tag_by_name]
 
 # ---- 3. Sales team ----
+# El team real en mnconsultoria.odoo.com se llama "Sitio web" (con espacio).
+# Re-uso del existente para evitar duplicación (user unico pago).
 teams = query('crm.team', 'search_read',
-              [[('name', '=', 'Web')]],
+              [[('name', '=', 'Sitio web')]],
               {'fields': ['id', 'name']})
 
 # ---- 4. UTM source ----
@@ -207,7 +210,7 @@ if missing_tags or not teams or not src_match or not users:
     if missing_tags:
         print(f"#     Tags faltantes ({len(missing_tags)}): {missing_tags} — Paso 1", file=sys.stderr)
     if not teams:
-        print(f"#     Sales team 'Web' no existe — Paso 2", file=sys.stderr)
+        print(f"#     Sales team 'Sitio web' no existe — Paso 2 (re-uso existente, no crear duplicado)", file=sys.stderr)
     if not src_match:
         print(f"#     UTM source 'Web — mnconsultoria.org' no existe — Paso 3", file=sys.stderr)
     if not users:

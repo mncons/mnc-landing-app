@@ -1,6 +1,6 @@
 # ODOO_SETUP.md — Configuración manual previa al Worker `lead-to-odoo`
 
-**Bloqueante:** el Worker NO se codea hasta que este setup esté ejecutado en `https://mnaranjo.odoo.com` y los IDs reales estén en mano vía `tests/odoo-smoke.sh`.
+**Bloqueante:** el Worker NO se codea hasta que este setup esté ejecutado en `https://mnconsultoria.odoo.com` y los IDs reales estén en mano vía `tests/odoo-smoke.sh`.
 
 **Duración estimada:** ~1 h primera vez (cuentas: ~10 min cada paso).
 **Re-ejecutable:** sí. Idempotente para tags y team (si ya existen, no se duplican).
@@ -9,22 +9,23 @@
 
 ## Pre-requisitos
 
-- [ ] Acceso de administrador a `https://mnaranjo.odoo.com` (super-user MN).
+- [ ] Acceso de administrador a `https://mnconsultoria.odoo.com` (super-user MN, login `info@mnconsultoria.org`).
 - [ ] Módulos instalados (verificar en Apps):
   - **CRM** (`crm`) — obligatorio
   - **UTM** (`utm`) — viene con CRM/Sales en Odoo 17/18; verificar.
 - [ ] El usuario super-user MN tiene grupo "Administración: Configuración" para crear API keys + UTM sources.
+- [ ] **2FA activo en la cuenta del super-user** (Google Authenticator, Authy o similar). Odoo Enterprise online exige 2FA enforced para que el modal de "API Keys → New" sea accesible. **NO desactivar 2FA después.**
 
 ---
 
-## Paso 1 — Tags CRM (10 tags obligatorios)
+## Paso 1 — Tags CRM (11 tags obligatorios)
 
 **Ruta UI:**
 ```
 Apps → CRM → Configuración → Etiquetas (CRM Tags)
 ```
 
-**Crear los siguientes 10 tags con nombre exacto** (mayúsculas/minúsculas importan):
+**Crear los siguientes 11 tags con nombre exacto** (mayúsculas/minúsculas importan):
 
 | # | Nombre exacto del tag | Color sugerido | Uso |
 |---|---|---|---|
@@ -38,6 +39,7 @@ Apps → CRM → Configuración → Etiquetas (CRM Tags)
 | 8 | `sector-agencias` | rosa | Vertical Agencias Creativas |
 | 9 | `sector-bpm` | celeste | Vertical BPM Inteligente |
 | 10 | `sector-marketplace` | gris oscuro | Vertical Marketplace Consultoría |
+| 11 | `sector-manufactura` | marrón | Vertical Manufactura (agregado tras setup real 2026-05-15) |
 
 **Procedimiento por tag:**
 1. Botón "Nuevo" arriba a la izquierda.
@@ -49,23 +51,27 @@ Apps → CRM → Configuración → Etiquetas (CRM Tags)
 
 ---
 
-## Paso 2 — Sales Team "Web"
+## Paso 2 — Sales Team "Sitio web" (re-usar existente)
 
 **Ruta UI:**
 ```
 Apps → CRM → Configuración → Equipos de venta
 ```
 
-**Procedimiento:**
-1. Botón "Nuevo".
-2. Campo "Nombre del Equipo de Ventas" → `Web` (exacto, 3 caracteres).
-3. Campo "Alias del Equipo" → opcional, sugerido `web@mnconsultoria.org` (si tenés alias mail configurado en Odoo; si no, dejar vacío).
-4. Campo "Líder del Equipo" → el super-user MN.
-5. Marcar "CRM" en "Use Pipelines" / "Usar Pipeline".
-6. Tab "Members" / "Miembros" → agregar el super-user MN al menos.
-7. Guardar.
+**Importante:** en `mnconsultoria.odoo.com` ya existe un team llamado **"Sitio web"** (con espacio, capitalización exacta). Este es el team a usar — NO crear duplicado "Web". Justificación: user único pago, evitar fragmentación del pipeline.
 
-**Verificación:** en la lista de equipos debe aparecer `Web` con leader = super-user MN.
+**Procedimiento (re-uso del existente):**
+1. Abrir el team `Sitio web` desde la lista.
+2. Verificar que tiene "Use Pipelines" / "Usar Pipeline" activado.
+3. **Alias del Equipo** → debe estar configurado en `leads@mnconsultoria.org` (confirmado tras setup real 2026-05-15).
+4. **Líder del Equipo** → super-user MN.
+5. Tab "Members" / "Miembros" → super-user MN presente.
+6. Tab "Followers" / "Seguidores" → agregar `leads@mnconsultoria.org` como follower con suscripciones completas a notificaciones (Opción B del Paso 5 — aplicada).
+7. Guardar si hubo cambios.
+
+**Verificación:** smoke script busca con `name = "Sitio web"` exacto. El `ID` se devuelve como `TEAM_WEB` en la salida YAML.
+
+**Si no existe** (Odoo nuevo o ambiente distinto): crear con nombre exacto `Sitio web`, alias `leads@mnconsultoria.org`, leader super-user MN.
 
 ---
 
@@ -110,27 +116,34 @@ Esquina superior derecha → Click en avatar/iniciales → "Mi Perfil" / "Prefer
 - Mitigación: el super-user MN tiene todos los permisos, pero el Worker SOLO va a llamar `crm.lead.create` y `crm.tag/team/utm.source.search_read`. No hay escalación adicional posible desde el Worker porque está sandboxed por código.
 - **Acción Ola 2:** crear un usuario técnico dedicado `worker-web@mnconsultoria.local` con grupos solo de CRM + UTM read, y generar API key sobre ese user. Bajamos blast-radius en caso de leak.
 
+**Estado real tras setup 2026-05-15:**
+- API key activa: **"Landing"** (única dedicada al Worker)
+- Vence: **2026-11-11** (180 días — la duración default cuando se eligió la rotación trimestral declarada en el spec se extendió por confort operativo del usuario)
+- Rotación calendarizada: **2026-11-04** (7 días antes del vencimiento)
+- 2FA con Google Authenticator: **activado y enforced** en el super-user — requisito para que el API key creation modal sea accesible. NO desactivar.
+
 ---
 
-## Paso 5 — Notificación email a `leads@mnconsultoria.org` (opcional pero recomendado)
+## Paso 5 — Notificación email a `leads@mnconsultoria.org`
 
-Odoo dispara `mail.activity` automáticamente al crear `crm.lead`. Para que llegue email también a `leads@mnconsultoria.org`:
+**Decisión aplicada Ola 1: Opción B** (follower en el team `Sitio web`).
 
-**Opción A — Server Action sobre create (recomendada):**
-```
-Apps → Configuración → Técnico → Acciones del Servidor
-```
-1. Botón "Nuevo".
-2. Nombre: `Notify leads@ on web lead created`.
-3. Modelo: `crm.lead`.
-4. Trigger: `On Creation` (si está disponible) o manual desde una Automation.
-5. Tipo de Acción: `Send Email` (o `Execute Code` con un `template.send_mail`).
-6. Plantilla email: crear una nueva en `Configuración → Técnico → Plantillas Email` con asunto `Nuevo Lead · {{object.name}}` y destinatario `leads@mnconsultoria.org`.
+En `Sales team Sitio web` → tab "Followers" / "Seguidores" → `leads@mnconsultoria.org` como follower con **todas las suscripciones de notificación marcadas** (Discussions, Notes, Activities, …). Cualquier `crm.lead` asignado al team dispara mail automático.
 
-**Opción B — Suscribir leads@ al equipo `Web`:**
-Más simple. En `Sales team Web` → tab "Followers" → agregar `leads@mnconsultoria.org` como follower del equipo. Cualquier lead asignado al equipo dispara mail automático.
+**Estado real tras setup 2026-05-15:**
+- Follower `leads@mnconsultoria.org` configurado con suscripciones completas — **OK**.
+- Plantilla custom de correo creada (`Nuevo Lead · {{object.name}}`) pero **NO asociada a automatización** — queda como artefacto para Ola 2 si se decide cambiar de Opción B a Opción A.
 
-**Recomendación Ola 1:** Opción B (5 min vs 30 min, mismo efecto).
+### Email-to-Lead automático (IMAP incoming) — diferido a Ola 2
+
+El alias `leads@mnconsultoria.org` está creado en Odoo y configurado en el team `Sitio web`. **Sin embargo**, el feature "Email-to-Lead" (parsear emails entrantes y crear `crm.lead` automáticamente) requiere un **incoming mail server** vía IMAP en `Configuración → Técnico → Email → Incoming Mail Servers`.
+
+**Decisión Ola 1: NO configurar IMAP.** Razones:
+1. Requiere guardar las credentials IMAP del buzón `leads@mnconsultoria.org` (password completo o app-password) en Odoo — superficie de leak ampliada.
+2. El flujo Lead Ola 1 va del form web al Worker al `crm.lead.create` directo. NO depende de email entrante.
+3. Emails dirigidos a `leads@` siguen llegando como follower (notificación outbound), no como creación inbound.
+
+**Ola 2 (cuando sea):** configurar IMAP solo si se quiere capturar respuestas de clientes a hilos como follow-up automático. Pre-requisito: revisar política de secrets de email en Bitwarden/wrangler.
 
 ---
 
@@ -144,13 +157,13 @@ Más simple. En `Sales team Web` → tab "Followers" → agregar `leads@mnconsul
 
 Contenido (sin export, sin comillas para wrangler dev format):
 ```
-ODOO_URL=https://mnaranjo.odoo.com
-ODOO_DB=mnaranjo
+ODOO_URL=https://mnconsultoria.odoo.com
+ODOO_DB=mnconsultoria
 ODOO_USER=info@mnconsultoria.org
 ODOO_API_KEY=<la-key-del-paso-4>
 ```
 
-> **`ODOO_DB`** suele ser el nombre del subdomain (`mnaranjo` para `mnaranjo.odoo.com`). Si no, verificá en `https://mnaranjo.odoo.com/web/database/selector` (si está habilitado) o pegale a `https://mnaranjo.odoo.com/web/database/list`.
+> **`ODOO_DB`** = `mnconsultoria` (confirmado tras setup real 2026-05-15). En general es el nombre del subdomain. Si dudás, verificá en `https://mnconsultoria.odoo.com/web/database/selector` o `https://mnconsultoria.odoo.com/web/database/list`.
 
 > `.dev.vars` está en `.gitignore` — nunca se commitea. Es solo para `wrangler dev --local` y para el smoke script. Los secrets de producción se ponen con `wrangler secret put` cuando deployemos en 2.B.
 
@@ -163,30 +176,30 @@ cd ~/projects/mnc-landing-app
 ./tests/odoo-smoke.sh
 ```
 
-**Output esperado** (si todo está bien configurado):
+**Output esperado** (si todo está bien configurado; los IDs reales serán distintos):
 
 ```yaml
 # === IDs encontrados (pegar a wrangler secret put) ===
 
 # Tags simples
-TAG_WEB:     "12"
-TAG_DOMAIN:  "13"
-TAG_SMOKE:   "14"
+TAG_WEB:     "4"
+TAG_DOMAIN:  "5"
+TAG_SMOKE:   "6"
 
-# Tags por sector (JSON único para 1 secret)
-TAG_SECTORS: '{"horeca":15,"agroindustria":16,"retail":17,"servicios-profesionales":18,"agencias":19,"bpm":20,"marketplace":21}'
+# Tags por sector (JSON único para 1 secret — 8 sectores incluyendo manufactura)
+TAG_SECTORS: '{"horeca":7,"agroindustria":8,"retail":9,"servicios-profesionales":10,"agencias":11,"bpm":12,"marketplace":13,"manufactura":<id>}'
 
-# Sales team
-TEAM_WEB: "5"
+# Sales team "Sitio web" (re-uso, no Web)
+TEAM_WEB: "<id>"
 
 # UTM source
-UTM_SOURCE_WEB: "8"
+UTM_SOURCE_WEB: "20"
 
 # Owner default (super-user MN)
 USER_SUPER_MN: "2"
 ```
 
-(Los IDs reales van a ser distintos en tu Odoo — depende del orden de creación.)
+Los IDs de arriba reflejan el setup real de `mnconsultoria.odoo.com` al 2026-05-15. `<id>` corresponde a entidades que se ajustaron post-setup inicial (sector manufactura + team Sitio web).
 
 **Si el script falla:**
 - `authenticate falló (uid is False)` → revisar `ODOO_USER` (email exacto) y `ODOO_API_KEY` (sin espacios al copiar).
