@@ -1,0 +1,44 @@
+# Copia este archivo a `.dev.vars` (gitignored) y rellená con valores reales.
+# `.dev.vars` lo lee `wrangler pages dev` para inyectar env vars en la
+# Pages Function `functions/api/lead.ts` durante desarrollo local.
+#
+# Para desarrollo end-to-end local:
+#
+#   Terminal 1: `pnpm dev`
+#       Astro dev server :4321 — sirve el HTML/JS estático.
+#   Terminal 2: `pnpm wrangler pages dev . --port 8788`
+#       Pages dev — sirve el sitio estático + las functions/api/* en :8788.
+#       (Astro v6 + Pages soportan deploy combinado; en dev local los
+#        levantamos por separado para iterar más rápido.)
+#   Terminal 3: `cd workers/lead-to-odoo && pnpm dev`
+#       Worker en :8787 con su propio `.dev.vars` (workers/lead-to-odoo/
+#       .dev.vars.example).
+#
+# El form en `src/pages/contacto.astro` (2.D) hace POST a `/api/lead`
+# servido por `wrangler pages dev`, que forwardea a
+# `http://127.0.0.1:8787` (LEAD_WORKER_URL en este archivo).
+#
+# Ver MIGRATION_LOG.md decisión #10 (sub-lote 2.C).
+
+# ---- Handshake interno con el Worker ----
+# Debe coincidir EXACTAMENTE con el LEAD_INTERNAL_SECRET del
+# workers/lead-to-odoo/.dev.vars (compartido).
+# Generar con: openssl rand -base64 32
+LEAD_INTERNAL_SECRET=REPLACE_WITH_OPENSSL_RAND_BASE64_32
+
+# ---- URL del Worker ----
+# Dev local: http://127.0.0.1:8787 (el puerto default de `wrangler dev`)
+# Producción: https://mnc-lead-to-odoo.<account>.workers.dev
+LEAD_WORKER_URL=http://127.0.0.1:8787
+
+# ---- Turnstile (opcional en dev) ----
+# Sin TURNSTILE_SECRET_KEY la Pages Function skipea siteverify con log warn.
+# En producción se carga via `wrangler pages secret put TURNSTILE_SECRET_KEY`.
+# Cloudflare ofrece test keys que siempre pasan o fallan en:
+#   https://developers.cloudflare.com/turnstile/troubleshooting/testing/
+# TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA   # always-pass test key
+
+# ---- CORS allowlist ----
+# Mismos orígenes que el Worker. En dev local incluir http://localhost:4321
+# y http://127.0.0.1:8788 (donde corre wrangler pages dev) por defensa.
+ALLOWED_ORIGINS=http://localhost:4321,http://127.0.0.1:8788,https://mnconsultoria.org,https://www.mnconsultoria.org,https://mnc-landing-app.pages.dev

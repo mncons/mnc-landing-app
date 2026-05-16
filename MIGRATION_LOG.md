@@ -207,6 +207,126 @@ Workers Observability captura `console.{log|warn|error}` con `head_sampling_rate
 
 ---
 
+### 10. Pages Function `/api/lead` (sub-lote 2.C) — BFF edge + schema compartido + Turnstile siteverify
+
+**Arquitectura final del flujo Lead:**
+
+```
+ContactForm.astro (cliente, lote 2.D)
+        │   POST /api/lead
+        ▼
+functions/api/lead.ts (Pages Function · 2.C · este sub-lote)
+   - CORS allowlist
+   - Zod schema (compartido)
+   - Honeypot indistinguible
+   - Consent (path único → 400 consent_required)
+   - Turnstile siteverify ← solo aquí, no en Worker
+   - Forward al Worker con X-Internal-Secret + payload enriquecido
+        │   POST $LEAD_WORKER_URL
+        ▼
+workers/lead-to-odoo/src/index.ts (Worker · 2.B)
+   - Defensa en profundidad (CORS + secret + rate-limit + Zod re-validación)
+   - Honeypot defensivo (re-check)
+   - XML-RPC → crm.lead.create
+```
+
+**10.1. Schema compartido en `src/lib/lead-schema.ts`**
+
+Fuente única de verdad. Pages Function lo importa directo. El Worker re-exporta + extiende con `LeadPayloadEnriched` (ip/ua/ts agregados por la PF tras forward). `workers/lead-to-odoo/tsconfig.json` incluye el path cross-directory `../../src/lib/lead-schema.ts`.
+
+**Trade-off:** los dos bundles (root Astro + Worker) cargan zod independientemente. Bundle Worker pasó de 140 KiB → 264 KiB / 45 KiB gzip por incluir el lib compartido (wrangler resuelve el import relativo y empaqueta). Aceptable para Ola 1; alternativa monorepo workspace queda para Ola 2 si crecen los Workers.
+
+**10.2. Downgrade a `zod@^3.24.0` (root + Worker)**
+
+Probé zod 4.4.3 primero (instalado por default con `pnpm add zod`). **Bundle del Worker explotó de 140 KiB a 1.1 MB** / 25 KiB → 167 KiB gzip. Tree-shaking de zod 4 incluye demasiado para nuestro caso de uso (un solo schema, sin discriminated unions ni refinements complejos).
+
+Decisión: alinear AMBOS lados a `zod@^3.24.0` (la versión que ya tenía el Worker). Trade-off:
+- Pierdo APIs nuevas zod 4 (`z.email()`, `z.literal(true, {message})`).
+- Mantengo `errorMap: () => ({message})` y `z.string().email()` que son zod 3 idiomático.
+- Bundle vuelve a 264 KiB / 45 KiB gzip (~2× del original sin shared, aceptable).
+
+Documentado en `package.json` raíz + Worker como dep explícita `^3.24.0`. Evitar `pnpm add zod` sin tag de versión en Ola 1 — empuja a 4.x por default.
+
+**10.3. Turnstile siteverify EN la Pages Function, no en el Worker**
+
+Decisión: la verificación server-side del Turnstile token contra `https://challenges.cloudflare.com/turnstile/v0/siteverify` vive en `functions/api/lead.ts`. El Worker NO recibe el token (la PF lo extrae del payload enriquecido antes de forwardear).
+
+**Razones:**
+1. **Separación de capas**: el BFF (Pages Function) es el responsable de validar inputs del cliente. El Worker es responsable de interactuar con Odoo. Turnstile es validación de input.
+2. **Defensa en profundidad inalterada**: el Worker sigue con CORS + internal secret + rate-limit + Zod re-validación + honeypot defensivo. Si un atacante bypassa la PF y pega directo al Worker, el internal secret lo bloquea.
+3. **Skip en dev local**: si `TURNSTILE_SECRET_KEY` está ausente del env, la PF skipea con log warn. Permite `wrangler pages dev` sin Turnstile keys.
+
+Schema base agrega `turnstile_token: z.string().trim().max(2048).optional()`. La PF lo valida cuando hay secret; lo descarta antes de forwardear al Worker.
+
+**10.4. Tipos `PagesFunction` manuales en lugar de `@cloudflare/workers-types` global**
+
+Cloudflare ofrece `@cloudflare/workers-types` con `PagesFunction<Env>` typed. Probé agregarlo al root Astro — `astro check` se rompía porque los types globales de Workers (`KVNamespace`, `ExecutionContext`, `ExportedHandler`) chocaban con los tipos web standard de Astro/Vite.
+
+Decisión: tipos manuales inline en `functions/api/lead.ts`:
+
+```typescript
+interface PagesFunctionContext<E = unknown> {
+  request: Request;
+  env: E;
+  next: () => Promise<Response>;
+  waitUntil: (promise: Promise<unknown>) => void;
+}
+type PagesFunction<E = unknown> = (
+  context: PagesFunctionContext<E>,
+) => Response | Promise<Response>;
+```
+
+Trade-off: si CF agrega features nuevas a Pages Functions (e.g. `params` para dynamic routes), hay que actualizar la interface a mano. Beneficio: zero contamination del tsconfig global de Astro; `astro check` permanece limpio.
+
+**10.5. Consent path único → `400 consent_required` específico**
+
+El schema base usa `z.literal(true, { errorMap: () => ({ message: "consent_required" }) })`. Si Zod falla SÓLO en `consent_privacidad` (longitud `issues === 1` y `path[0] === "consent_privacidad"`), la PF devuelve `{error: "consent_required"}` top-level. Si fallan otros campos junto al consent, devuelve `{error: "invalid_payload", fields: [...]}` genérico.
+
+Esto permite que el UI muestre un mensaje específico ("Necesitamos tu consentimiento para procesar el formulario") sin parsear el array de fields.
+
+**10.6. Exclude `workers/**` del tsconfig raíz**
+
+`astro check` y `tsc` del root estaban scanneando `workers/lead-to-odoo/` y se quejaban de los tipos de Workers (KVNamespace, etc.) que solo existen en el tsconfig del Worker. Excluido en `tsconfig.json` raíz:
+
+```json
+{
+  "exclude": ["dist", "workers", "**/node_modules", "**/dist"]
+}
+```
+
+Cada Worker mantiene su propio tsconfig autocontenido. El cross-directory import del shared schema se resuelve via include explícito en `workers/lead-to-odoo/tsconfig.json`:
+
+```json
+{
+  "include": [
+    "src/**/*.ts",
+    "../../src/lib/lead-schema.ts"
+  ]
+}
+```
+
+**10.7. Logger reducido en PF (no compartido con Worker)**
+
+Cada lado tiene su propio logger:
+- Worker: `workers/lead-to-odoo/src/logger.ts` (más completo, con `LogRecord` tipado).
+- PF: inline en `functions/api/lead.ts` (más simple, sin types públicos).
+
+Ambos comparten la misma lista negra de `PII_KEYS` (nombre, email, telefono, mensaje, ip, ua, secrets, headers sensibles). Trade-off: mínima duplicación de código (~20 líneas) vs evitar otro módulo compartido cross-directory. Beneficio: cada lado autocontenido en su build.
+
+**Build verificado:**
+- `pnpm install` root y Worker OK (zod 3.25.76)
+- `pnpm typecheck` Worker → 0 errors
+- `pnpm exec astro check` root → 0 errors / 0 warnings / 0 hints (6 archivos)
+- `pnpm exec tsc --noEmit` root → 0 errors
+- `pnpm build:dry` Worker → 264.54 KiB / 45.34 KiB gzip (vs 1.1 MB con zod 4)
+
+**Pendiente antes de smoke real (lote 2.D):**
+- `wrangler pages dev` lee `.dev.vars` raíz (creado: `.dev.vars.example`).
+- Worker deployado o `wrangler dev` corriendo en :8787 con su propio `.dev.vars`.
+- Variables compartidas: `LEAD_INTERNAL_SECRET` (mismo valor en ambos lados, generar con `openssl rand -base64 32`).
+
+---
+
 ## Decisiones técnicas — lote 1
 
 ### 1. `pyftsubset` directo en lugar de `glyphhanger` CLI
