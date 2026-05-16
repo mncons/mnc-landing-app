@@ -13,6 +13,30 @@ Registro de migración de artefactos del legacy a `mnc-landing-app` + decisiones
 
 ---
 
+## Decisiones técnicas — lote 2
+
+### 7. ODOO_SETUP.md como bloqueo intencional antes de codear el Worker (sub-lote 2.A)
+
+**Contexto:** el Worker `lead-to-odoo` (sub-lote 2.B) necesita IDs reales de tags, team, UTM source y user de Odoo para mapear `crm.lead.create`. Sin esos IDs el Worker no compila lógica útil.
+
+**Decisión:** generar `workers/lead-to-odoo/ODOO_SETUP.md` + `tests/odoo-smoke.sh` como primer sub-lote (2.A) **antes** de cualquier código del Worker. El user ejecuta el setup manual en `mnaranjo.odoo.com`, corre el script, devuelve los IDs en YAML. Recién entonces arranca 2.B.
+
+**Razones:**
+1. **Single point of failure clarificado:** si el setup Odoo está mal, lo detectamos en minutos en lugar de en el primer smoke e2e del 2.D (después de horas de código).
+2. **Trazabilidad de configuración:** el `.md` queda como referencia para futuras rotaciones de API key o recreación del entorno si Odoo se cae.
+3. **Idempotencia:** el script smoke se puede re-correr sin efectos secundarios (las queries son `search_read` puras; el `--create-test-lead` es opt-in).
+4. **Defensa en profundidad:** valida credentials antes de exponerlas al Worker.
+
+**Componentes:**
+- `ODOO_SETUP.md`: checklist UI paso a paso para 10 tags (7 sectores + web + mnconsultoria.org + smoke-test), Sales team `Web`, UTM source `Web — mnconsultoria.org`, API key (rotación trimestral declarada), `.dev.vars` local.
+- `tests/odoo-smoke.sh`: bash + python3 inline con `xmlrpc.client` stdlib (cero deps extra). Autentica, lista IDs, soporta `--create-test-lead`. Exit codes 0/1/2/3 según tipo de fallo.
+
+**Bloqueo declarado:** sub-lote 2.B no se inicia hasta que el user devuelva la salida YAML del script con todos los IDs ≠ `MISSING`.
+
+**Rotación API key:** declarada cada 90 días en `ODOO_SETUP.md §4`. Próxima rotación: 2026-08-06 (7 días antes del vencimiento si setup ejecutado 2026-05-15).
+
+---
+
 ## Decisiones técnicas — lote 1
 
 ### 1. `pyftsubset` directo en lugar de `glyphhanger` CLI

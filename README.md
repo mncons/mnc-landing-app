@@ -31,16 +31,23 @@ es current major estable (Astro 6.3.3 al 2026-05-15). Ver
 ## Comandos
 
 ```bash
-pnpm dev            # dev server :4321
-pnpm build          # build a dist/
-pnpm preview        # preview del build
-pnpm astro check    # type-check
-pnpm fonts:subset   # regenerar .woff2 desde .fonts-source/*.otf
+pnpm dev                              # dev server :4321
+pnpm build                            # build a dist/
+pnpm preview                          # preview del build
+pnpm astro check                      # type-check
+pnpm fonts:subset                     # regenerar .woff2 desde .fonts-source/*.otf
+./tests/odoo-smoke.sh                 # validar credentials Odoo + listar IDs (lote 2.A)
+./tests/odoo-smoke.sh --create-test-lead  # smoke: crear Lead de prueba en Odoo (con tag smoke-test)
 ```
 
 Pre-requisito de `fonts:subset`: `python3-fonttools` + `python3-brotli`
 instalados (apt). El script usa `pyftsubset` directo, no `glyphhanger` CLI
 (decisión documentada en `MIGRATION_LOG.md`).
+
+Pre-requisito de `odoo-smoke.sh`: `python3` (xmlrpc.client viene con stdlib,
+cero deps extra). Lee `workers/lead-to-odoo/.dev.vars` o env vars
+`ODOO_URL`/`ODOO_DB`/`ODOO_USER`/`ODOO_API_KEY`. Ver
+`workers/lead-to-odoo/ODOO_SETUP.md` para el setup manual previo en Odoo.
 
 ---
 
