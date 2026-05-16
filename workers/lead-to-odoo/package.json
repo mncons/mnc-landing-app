@@ -1,0 +1,21 @@
+{
+  "name": "mnc-lead-to-odoo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker — recibe lead payload desde Pages Function /api/lead y crea crm.lead en Odoo Enterprise via XML-RPC.",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "deploy": "wrangler deploy",
+    "build:dry": "wrangler deploy --dry-run --outdir=dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260515.0",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.92.0"
+  }
+}

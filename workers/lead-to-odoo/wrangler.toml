@@ -1,0 +1,62 @@
+name = "mnc-lead-to-odoo"
+main = "src/index.ts"
+compatibility_date = "2026-05-15"
+
+# Workers Observability — head_sampling_rate=1.0 en Ola 1 por bajo tráfico.
+# Captura console.log/warn/error automáticamente y los envía al dashboard.
+# Bajar a 0.1 en Ola 2 si el volumen crece y los costos pegan.
+[observability]
+enabled = true
+head_sampling_rate = 1.0
+
+# KV namespace para rate limiting.
+# Crear con: wrangler kv:namespace create "RATE_LIMIT"
+# Pegar el id real abajo (preview_id solo si se usa --env preview).
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "REPLACE_WITH_REAL_KV_ID"
+
+# Vars públicas (no secret). Editables sin re-deploy via wrangler secret put NO,
+# pero sí via re-deploy de wrangler.toml. Para Ola 1 OK.
+[vars]
+ALLOWED_ORIGINS = "https://mnconsultoria.org,https://www.mnconsultoria.org,https://mnc-landing-app.pages.dev"
+RATE_LIMIT_MAX = "10"
+RATE_LIMIT_WINDOW_SECONDS = "60"
+ODOO_TIMEOUT_MS = "8000"
+ODOO_MAX_RETRIES = "2"
+LOG_LEVEL = "info"
+
+# ============================================================================
+# SECRETS — declarados aquí solo para referencia. NO poner valores en este
+# archivo (es commiteado). Configurar con `wrangler secret put NOMBRE` o vía
+# `.dev.vars` (gitignored) para `wrangler dev --local`.
+#
+# Lista de secrets esperados:
+#
+#   LEAD_INTERNAL_SECRET   random 32 bytes base64. Generar con:
+#                          openssl rand -base64 32
+#                          Compartido con la Pages Function (2.C).
+#
+#   ODOO_URL               https://mnconsultoria.odoo.com
+#   ODOO_DB                mnconsultoria
+#   ODOO_USER              info@mnconsultoria.org
+#   ODOO_API_KEY           API key "Landing" desde KeePassXC vault MNC.kdbx.
+#                          Sin expiración explícita. Rotación manual
+#                          borrar+recrear cada ~90 días (próxima 2026-08-14).
+#                          Ver MIGRATION_LOG.md decisión #8.
+#
+#   TAG_WEB                "4"   (crm.tag — nombre "web")
+#   TAG_DOMAIN             "5"   (crm.tag — nombre "mnconsultoria.org")
+#   TAG_SMOKE              "6"   (crm.tag — nombre "smoke-test")
+#   TAG_SECTORS            JSON: {"horeca":7,"agroindustria":8,"retail":9,
+#                                 "servicios-profesionales":10,"agencias":11,
+#                                 "bpm":12,"marketplace":13,"manufactura":14}
+#
+#   TEAM_WEB               "2"   (crm.team — name técnico "Website", UI es:
+#                                 "Sitio web". Ver MIGRATION_LOG #8.1)
+#   UTM_SOURCE_WEB         "20"  (utm.source — "Web — mnconsultoria.org")
+#   USER_SUPER_MN          "2"   (res.users — owner default de los leads web)
+#
+# Colisión numérica TEAM_WEB="2" y USER_SUPER_MN="2" es OK: modelos
+# distintos (crm.team vs res.users). Ver MIGRATION_LOG #8.
+# ============================================================================

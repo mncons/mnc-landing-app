@@ -1,0 +1,25 @@
+# Copy this file to `.dev.vars` (gitignored) and fill in real values.
+# `.dev.vars` is loaded by `wrangler dev --local` AND by `tests/odoo-smoke.sh`.
+#
+# To generate LEAD_INTERNAL_SECRET:
+#   openssl rand -base64 32
+#
+# Real values for ODOO_* are documented in workers/lead-to-odoo/ODOO_SETUP.md.
+
+# ---- Internal handshake Pages Function ↔ Worker ----
+LEAD_INTERNAL_SECRET=REPLACE_WITH_OPENSSL_RAND_BASE64_32
+
+# ---- Odoo Enterprise online ----
+ODOO_URL=https://mnconsultoria.odoo.com
+ODOO_DB=mnconsultoria
+ODOO_USER=info@mnconsultoria.org
+ODOO_API_KEY=REPLACE_WITH_KEEPASS_LANDING_KEY
+
+# ---- IDs reales de mnconsultoria.odoo.com (smoke 2026-05-16) ----
+TAG_WEB=4
+TAG_DOMAIN=5
+TAG_SMOKE=6
+TAG_SECTORS={"horeca":7,"agroindustria":8,"retail":9,"servicios-profesionales":10,"agencias":11,"bpm":12,"marketplace":13,"manufactura":14}
+TEAM_WEB=2
+UTM_SOURCE_WEB=20
+USER_SUPER_MN=2

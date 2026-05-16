@@ -128,6 +128,85 @@ ID=3  active=False  name='Point of Sale'   (UI español: "Punto de venta")
 
 ---
 
+### 9. Worker `lead-to-odoo` (sub-lote 2.B) — arquitectura y decisiones
+
+**Stack:** Cloudflare Worker · TypeScript strict · Zod · XML-RPC manual · KV rate limit · Workers Observability.
+
+**9.1. XML-RPC manual sin librería externa**
+
+Las opciones disponibles (`xmlrpc`, `fast-xml-parser`) traen deps Node que wrangler no resuelve sin `compatibility_flags = ["nodejs_compat"]`. El subset de XML-RPC que necesitamos para `crm.lead.create` es trivial:
+
+- Marshalling: `string | int | double | boolean | array | struct`.
+- Parsing del response: `<int>` (lead_id) + `<fault>` (faultCode + faultString).
+
+Implementado en `src/odoo-client.ts` con `escapeXml()` + `marshal()` + `parseResponse()`. **Trade-off**: si Odoo cambia el formato wire en una versión futura (improbable; XML-RPC es estable hace 20 años), reescribimos. Beneficio: bundle 140 KiB / 25 KiB gzip, cero deps Node, cold start mínimo.
+
+**9.2. Cache de `uid` en `globalThis` del isolate (~15 min)**
+
+`common.authenticate(db, user, key)` se llama una vez por isolate y se cachea por 15 min. Cloudflare Workers reutiliza isolates entre requests del mismo POP (~15-30 min de vida del isolate). Ahorra ~200 ms por request en el path crítico.
+
+**Invalidación**: ante cualquier error 5xx o timeout, el cache se descarta y el siguiente call re-autentica. Esto cubre el caso de rotación de API key durante la vida del isolate.
+
+**9.3. Rate limit con `sha256(ip)` en KV, ventana 60 s, max 10**
+
+Implementado en `src/rate-limit.ts`. La IP se hashea antes de guardar en KV — defensa frente a leak accidental de PII si alguien inspecciona el namespace desde el dashboard.
+
+**Race condition documentada**: dos requests simultáneos con `count = max-1` pueden ambos pasar. El siguiente request sí ve `count >= max` y se rechaza. KV no ofrece strong consistency sin Durable Objects (overkill Ola 1). Impacto real es despreciable; mitigación más fuerte en Ola 2 si vemos abuso.
+
+**9.4. Honeypot indistinguible del éxito (Ajuste A del plan lote 2)**
+
+Si `payload.website !== ""`, el Worker responde `200 {ok:true, ref:null}`. No 4xx, no marca especial. Para el bot, parece éxito; no aprende a evadir. El log marca el evento `honeypot_triggered` para métricas internas.
+
+**9.5. Captura UTM + referrer en `description` (Ajuste C del plan lote 2)**
+
+Schema acepta `utm_source`, `utm_medium`, `utm_campaign`, `referrer` (opcionales, max 200 chars cada uno). Se anexan al `description` del lead Odoo después del mensaje con formato:
+
+```
+<mensaje del cliente>
+
+[source: <source>, utm_source=X, utm_medium=Y, utm_campaign=Z, referrer=R]
+```
+
+Si no hay UTMs, solo `[source: <source>]`. Visible en el lead Odoo para atribución sin Google Analytics.
+
+**9.6. CORS estricto con allowlist específico (D8 clarificación)**
+
+`ALLOWED_ORIGINS` env var (no secret): `https://mnconsultoria.org,https://www.mnconsultoria.org,https://mnc-landing-app.pages.dev`. Subdomain específico de Pages, **NO** wildcard `*.pages.dev` (cualquier proyecto Cloudflare podría originar requests).
+
+**9.7. Log estructurado JSON sin PII**
+
+`src/logger.ts` implementa una lista negra de keys (`PII_KEYS = {nombre, email, telefono, mensaje, ip, ua, ODOO_API_KEY, LEAD_INTERNAL_SECRET, Authorization, Cookie, ...}`). El sanitize filtra esas keys antes de serializar a JSON. Cualquier campo nuevo con PII debe sumarse a `PII_KEYS` o no pasarse a `log()`.
+
+Workers Observability captura `console.{log|warn|error}` con `head_sampling_rate=1.0` en Ola 1 (bajo tráfico — sampling 100% sin costo significativo). En Ola 2 si volumen crece bajar a 0.1.
+
+**9.8. Comparación constant-time del `LEAD_INTERNAL_SECRET`**
+
+`constantTimeEqual()` en `src/index.ts` itera el largo completo del string. Mitiga timing attacks pese a que la latencia de fetch en Workers es ruidosa — defensa en profundidad.
+
+**9.9. Retry exponencial 250 ms / 1 s ante 5xx HTTP o timeout; cero retry ante `OdooFault`**
+
+`OdooFault` es 4xx-equivalente (schema error, permission error) — determinístico. Retry no ayudaría. Solo retry para 5xx HTTP y `OdooTimeoutError` (network blip, restart). Después de retry exponencial agotado, propaga el error como `502 odoo_unavailable` al cliente.
+
+**9.10. Schema `source` regex permisiva en lugar de enum cerrado**
+
+`source: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)` en lugar de enum con `SOURCES = ['contacto', 'diagnostico-X', 'herramienta-Y', ...]`. Razón: agregar una herramienta nueva en el front (`tools/correlacion`, etc.) no debe romper el Worker. La validación garantiza formato (lowercase + kebab-case + 1..64 chars) sin lista cerrada.
+
+**9.11. `lang: "es_CO"` hardcoded en `crm.lead.create`**
+
+Único hardcode de string es el código `res.lang.code` (no traducido — los códigos `es_CO`, `en_US` son técnicos, no nombres). Si Ola 2 abre EN i18n, agregar `lang` al payload y permitir override.
+
+**Build verificado:**
+- `pnpm install` OK (zod + workers-types + wrangler + typescript)
+- `pnpm typecheck` OK (`tsc --noEmit`, strict mode)
+- `pnpm build:dry` OK (`wrangler deploy --dry-run`): bundle 140.45 KiB / gzip 25.65 KiB; bindings KV `RATE_LIMIT` + 6 env vars detectados
+
+**Pendiente antes de deployar (lote 2.C/2.D):**
+- `wrangler kv:namespace create "RATE_LIMIT"` y reemplazar `REPLACE_WITH_REAL_KV_ID` en `wrangler.toml`.
+- `openssl rand -base64 32 | wrangler secret put LEAD_INTERNAL_SECRET` (compartir mismo valor con Pages Function).
+- Resto de secrets via `wrangler secret put` con valores reales del Odoo setup.
+
+---
+
 ## Decisiones técnicas — lote 1
 
 ### 1. `pyftsubset` directo en lugar de `glyphhanger` CLI

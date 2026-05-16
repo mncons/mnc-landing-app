@@ -86,9 +86,22 @@ mnc-landing-app/
 │   │   └── index.astro
 │   └── styles/
 │       └── globals.css        # @theme + 4 @font-face + base + reduced-motion
-└── (lote 2)
-    ├── functions/api/lead.ts  # Pages Function
-    └── workers/lead-to-odoo/  # Worker XML-RPC → Odoo
+├── tests/
+│   └── odoo-smoke.sh                # validar credentials + listar IDs Odoo
+├── workers/
+│   └── lead-to-odoo/                # Cloudflare Worker · lote 2.B
+│       ├── wrangler.toml            # config + KV + observability + vars
+│       ├── package.json · tsconfig.json
+│       ├── .dev.vars.example        # template para wrangler dev --local
+│       ├── ODOO_SETUP.md            # setup manual previo en Odoo
+│       └── src/
+│           ├── index.ts             # entry: CORS, secret, rate-limit, schema, Odoo
+│           ├── schema.ts            # Zod (8 sectores + UTM + honeypot)
+│           ├── rate-limit.ts        # KV-based, sha256(ip), 60s window
+│           ├── logger.ts            # JSON structured, filtro PII por lista negra
+│           └── odoo-client.ts       # XML-RPC manual (zero Node deps) + retry
+└── functions/                       # Pages Functions · pendiente lote 2.C
+    └── api/lead.ts                  # BFF entre cliente y Worker
 ```
 
 Documentos de autoridad (NO se commitean al repo público):
