@@ -112,13 +112,28 @@ Esquina superior derecha → Click en avatar/iniciales → "Mi Perfil" / "Prefer
 
 **Procedimiento:**
 1. Click "Nueva clave API" / "New API Key".
-2. Descripción: `mnc-lead-to-odoo · CF Worker · {fecha-actual}`
-3. **Duración:** seleccionar 90 días (rotación trimestral declarada en spec §10).
+2. Descripción: `Landing` (sirve también como identificador para el procedimiento de rotación manual — borrar+recrear con mismo nombre).
+3. **Duración:** dos opciones reales en el modal de Odoo:
+   - **A. Sin expiración** (`No expiration` / la opción elegida en el setup real 2026-05-15). La key vive indefinidamente hasta borrarla. Trade-off: cero downtime accidental por olvido de rotación; depende totalmente de disciplina del calendario externo.
+   - **B. Expiración explícita** (7, 30, 90, 365 días). Odoo invalida automáticamente. Trade-off: si pasás la fecha sin rotar, el Worker empieza a fallar todos los POST de leads — outage visible hasta que se rota manualmente.
+
+   **Decisión Ola 1: Opción A (sin expiración) + rotación manual cada ~90 días.** Documentado en `MIGRATION_LOG.md` decisión #8.
 4. Click "Generar Clave" / "Generate Key".
-5. **COPIAR LA CLAVE EXACTAMENTE Y GUARDARLA EN BITWARDEN AHORA.** No se puede recuperar después; si se pierde hay que generar otra.
-6. Anotar también:
-   - Fecha de expiración (90 días desde hoy → 2026-08-13 si ejecutás hoy 2026-05-15).
-   - Agregar recordatorio de rotación en calendario para `2026-08-06` (7 días antes).
+5. **COPIAR LA CLAVE EXACTAMENTE Y GUARDARLA EN KEEPASSXC (vault `MNC.kdbx`) AHORA.** No se puede recuperar después; si se pierde hay que generar otra (con su consecuente actualización de wrangler secret en producción).
+6. **NO se puede editar el campo `expiration date` post-creación.** Si te equivocaste de duración, hay que borrar la key y rehacer desde 1.
+7. Anotar el calendario de rotación:
+   - **Próxima rotación: 2026-08-14** (~90 días desde 2026-05-15).
+   - Agregar evento en calendario con recordatorio `2026-08-07` (7 días antes).
+   - Procedimiento de rotación (Ola 1):
+     ```
+     1. Crear nueva API key 'Landing-new' (sin expiración).
+     2. Actualizar el wrangler secret: `wrangler secret put ODOO_API_KEY` con el valor nuevo.
+     3. Deployar Worker (`wrangler deploy`) para que tome el secret nuevo.
+     4. Verificar con un smoke real (un Lead de prueba) que la key nueva funciona.
+     5. Borrar la key vieja 'Landing' en Odoo.
+     6. Renombrar 'Landing-new' → 'Landing' (o dejar como está, cuestión cosmética).
+     ```
+   - Ventana de overlap entre key vieja y nueva: ~10-30 min. Si algo falla, rollback es trivial (no borrar la vieja hasta confirmar la nueva).
 
 **Cuestiones de scope:**
 - Odoo no permite limitar API key por modelo en UI estándar (Enterprise online). La key tiene los permisos del usuario.
@@ -126,9 +141,10 @@ Esquina superior derecha → Click en avatar/iniciales → "Mi Perfil" / "Prefer
 - **Acción Ola 2:** crear un usuario técnico dedicado `worker-web@mnconsultoria.local` con grupos solo de CRM + UTM read, y generar API key sobre ese user. Bajamos blast-radius en caso de leak.
 
 **Estado real tras setup 2026-05-15:**
-- API key activa: **"Landing"** (única dedicada al Worker)
-- Vence: **2026-11-11** (180 días — la duración default cuando se eligió la rotación trimestral declarada en el spec se extendió por confort operativo del usuario)
-- Rotación calendarizada: **2026-11-04** (7 días antes del vencimiento)
+- API key activa: **"Landing"** (única dedicada al Worker).
+- Vence: **indefinido** — opción "Sin expiración" elegida al crear. Odoo no permite editar el campo `expiration date` post-creación.
+- Rotación: **manual** vía borrar+recrear, cada ~90 días.
+- Próxima rotación calendarizada: **2026-08-14** (recordatorio externo en calendario).
 - 2FA con Google Authenticator: **activado y enforced** en el super-user — requisito para que el API key creation modal sea accesible. NO desactivar.
 
 ---

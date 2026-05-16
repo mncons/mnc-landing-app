@@ -33,7 +33,7 @@ Registro de migración de artefactos del legacy a `mnc-landing-app` + decisiones
 
 **Bloqueo declarado:** sub-lote 2.B no se inicia hasta que el user devuelva la salida YAML del script con todos los IDs ≠ `MISSING`.
 
-**Rotación API key:** declarada cada 90 días en `ODOO_SETUP.md §4`. Próxima rotación: 2026-08-06 (7 días antes del vencimiento si setup ejecutado 2026-05-15). Ver decisión #8 — la rotación real quedó en 180 días por confort operativo del user.
+**Rotación API key:** declarada cada 90 días en `ODOO_SETUP.md §4`. Estado real en decisión #8 sub-bloque "API key real": la key se creó **sin expiración explícita** (opción de Odoo aplicada al momento de generación). Odoo NO permite editar `expiration date` post-creación. Rotación es **manual** vía `borrar + recrear`. Próxima rotación calendarizada: **2026-08-14**.
 
 ---
 
@@ -72,8 +72,12 @@ USER_SUPER_MN:  "2"     # res.users — colisión numérica con TEAM_WEB OK (mod
 
 **API key real:**
 - Nombre: `Landing` (única dedicada al Worker, scope CRM por permisos del super-user).
-- Vence: **2026-11-11** (180 días — **duración default de Odoo aceptada**, NO una decisión deliberada de extender el periodo. El spec original declaraba rotación trimestral; al crear la key Odoo presentó 180 días como opción y se aceptó por ergonomía. Revisión: ciclo Q4 2026, decidir si bajar a 90).
-- Próxima rotación calendarizada: **2026-11-04** (7 días antes del vencimiento).
+- Vence: **indefinido — no expiration date configurada al crear la key.** Odoo permite elegir esa opción al momento de generación, pero NO permite editar el campo `expiration date` post-creación (ni a `null`, ni a una fecha concreta). Una vez creada, la key vive hasta que se borre manualmente.
+- **Rotación: manual, cada ~90 días vía `borrar key activa + crear key nueva con mismo nombre 'Landing'`** y actualizar el `wrangler secret put ODOO_API_KEY` con el valor nuevo. NO se confía en expiración automática.
+- **Próxima rotación calendarizada: 2026-08-14** (~90 días desde la creación del 2026-05-15). Recordatorio externo en calendario del user.
+- **Decisión Q4 2026:** evaluar si conviene generar keys con expiración explícita (60/90/180) en lugar del modelo "sin expiración + borrar+recrear". Trade-off:
+  - **Sin expiración + rotación manual** (modelo actual): cero downtime si se olvida la rotación; depende totalmente de disciplina del calendario. Si se compromete la key, no hay safety net.
+  - **Con expiración 90d**: Odoo invalida automáticamente; protege ante olvido. Trade-off: si pasás de fecha sin rotar, el Worker empieza a fallar todos los POST de leads hasta que se rota — outage visible.
 - Almacenamiento: **KeePass (KeePassXC, vault `MNC.kdbx` local)**. NO Bitwarden — el user gestiona credenciales en KeePassXC offline para reducir superficie cloud.
 
 **Acción inmediata tras este sub-lote:** el user re-corre `./tests/odoo-smoke.sh` y devuelve los 2 IDs pendientes (`TEAM_WEB` real + `TAG_SECTORS.manufactura`). Recién entonces arranca 2.B con todos los IDs en mano.
