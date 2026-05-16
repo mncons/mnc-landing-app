@@ -51,17 +51,26 @@ Apps → CRM → Configuración → Etiquetas (CRM Tags)
 
 ---
 
-## Paso 2 — Sales Team "Sitio web" (re-usar existente)
+## Paso 2 — Sales Team "Website" / UI español "Sitio web" (re-usar existente)
 
 **Ruta UI:**
 ```
 Apps → CRM → Configuración → Equipos de venta
 ```
 
-**Importante:** en `mnconsultoria.odoo.com` ya existe un team llamado **"Sitio web"** (con espacio, capitalización exacta). Este es el team a usar — NO crear duplicado "Web". Justificación: user único pago, evitar fragmentación del pipeline.
+**Importante (Odoo i18n):** los modelos de sistema de Odoo (`crm.team`, `crm.stage`, etc.) tienen el campo `name` almacenado **en inglés** en la base de datos, y la UI los muestra **traducidos** según el idioma de sesión. El team que ves en la UI español como **"Sitio web"** se llama **`Website`** a nivel DB.
+
+| Capa | Valor |
+|---|---|
+| `crm.team.name` (DB, técnico) | `Website` |
+| UI sesión español (`es_*`) | "Sitio web" |
+| UI sesión inglés (`en_US`) | "Website" |
+| Smoke script busca | `('name', '=', 'Website')` |
+
+**NO renombrar el team en la UI** — rompería las traducciones nativas de Odoo. Si lo cambiás a "Sitio web" o "Web" manualmente, perdés la i18n y vas a tener inconsistencias en clientes con otro idioma de sesión.
 
 **Procedimiento (re-uso del existente):**
-1. Abrir el team `Sitio web` desde la lista.
+1. Abrir el team `Sitio web` / `Website` desde la lista.
 2. Verificar que tiene "Use Pipelines" / "Usar Pipeline" activado.
 3. **Alias del Equipo** → debe estar configurado en `leads@mnconsultoria.org` (confirmado tras setup real 2026-05-15).
 4. **Líder del Equipo** → super-user MN.
@@ -69,9 +78,9 @@ Apps → CRM → Configuración → Equipos de venta
 6. Tab "Followers" / "Seguidores" → agregar `leads@mnconsultoria.org` como follower con suscripciones completas a notificaciones (Opción B del Paso 5 — aplicada).
 7. Guardar si hubo cambios.
 
-**Verificación:** smoke script busca con `name = "Sitio web"` exacto. El `ID` se devuelve como `TEAM_WEB` en la salida YAML.
+**Verificación:** smoke script busca con `name = "Website"` exacto (nombre técnico, no traducción). El ID se devuelve como `TEAM_WEB` en la salida YAML. En el setup real 2026-05-16 el ID resultó ser `2`.
 
-**Si no existe** (Odoo nuevo o ambiente distinto): crear con nombre exacto `Sitio web`, alias `leads@mnconsultoria.org`, leader super-user MN.
+**Si no existe** (Odoo nuevo o ambiente distinto): crear con nombre exacto `Website` (en inglés), alias `leads@mnconsultoria.org`, leader super-user MN. La UI español lo va a mostrar como "Sitio web" automáticamente.
 
 ---
 
@@ -143,7 +152,7 @@ El alias `leads@mnconsultoria.org` está creado en Odoo y configurado en el team
 2. El flujo Lead Ola 1 va del form web al Worker al `crm.lead.create` directo. NO depende de email entrante.
 3. Emails dirigidos a `leads@` siguen llegando como follower (notificación outbound), no como creación inbound.
 
-**Ola 2 (cuando sea):** configurar IMAP solo si se quiere capturar respuestas de clientes a hilos como follow-up automático. Pre-requisito: revisar política de secrets de email en Bitwarden/wrangler.
+**Ola 2 (cuando sea):** configurar IMAP solo si se quiere capturar respuestas de clientes a hilos como follow-up automático. Pre-requisito: guardar el password IMAP en KeePassXC (vault `MNC.kdbx`) + replicarlo en wrangler secret del Worker / setting de Odoo. Considerar app-password en vez de password principal del buzón.
 
 ---
 
@@ -189,8 +198,8 @@ TAG_SMOKE:   "6"
 # Tags por sector (JSON único para 1 secret — 8 sectores incluyendo manufactura)
 TAG_SECTORS: '{"horeca":7,"agroindustria":8,"retail":9,"servicios-profesionales":10,"agencias":11,"bpm":12,"marketplace":13,"manufactura":<id>}'
 
-# Sales team "Sitio web" (re-uso, no Web)
-TEAM_WEB: "<id>"
+# Sales team (re-uso) — name técnico 'Website' (UI español: 'Sitio web')
+TEAM_WEB: "2"
 
 # UTM source
 UTM_SOURCE_WEB: "20"
@@ -199,7 +208,7 @@ UTM_SOURCE_WEB: "20"
 USER_SUPER_MN: "2"
 ```
 
-Los IDs de arriba reflejan el setup real de `mnconsultoria.odoo.com` al 2026-05-15. `<id>` corresponde a entidades que se ajustaron post-setup inicial (sector manufactura + team Sitio web).
+Los IDs de arriba reflejan el setup real de `mnconsultoria.odoo.com` confirmado al 2026-05-16 tras los ajustes 2.A.1 (sector `manufactura` agregado, ID `14`) y 2.A.2 (bug Odoo i18n resuelto: team buscado por nombre técnico inglés `Website`, ID `2`).
 
 **Si el script falla:**
 - `authenticate falló (uid is False)` → revisar `ODOO_USER` (email exacto) y `ODOO_API_KEY` (sin espacios al copiar).

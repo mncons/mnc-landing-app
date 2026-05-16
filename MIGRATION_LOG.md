@@ -56,26 +56,25 @@ Registro de migración de artefactos del legacy a `mnc-landing-app` + decisiones
 | 9 | Email-to-Lead (IMAP) ambiguo | **NO configurado.** Alias funciona como outbound (follower) pero NO captura emails entrantes como `crm.lead`. Diferido a Ola 2 (riesgo de secrets IMAP) | Documentado como TODO Ola 2 |
 | 10 | Plantilla custom recomendada | Plantilla `Nuevo Lead · {{object.name}}` **creada pero NO asociada a automatización**. Artefacto disponible si Ola 2 cambia a Opción A | Documentado como artefacto Ola 2 |
 
-**IDs reales recibidos (smoke ejecutado 2026-05-15):**
+**IDs reales (smoke ejecutado 2026-05-15 + 2026-05-16 con ajustes 2.A.1/2.A.2):**
 
 ```yaml
 TAG_WEB:        "4"
 TAG_DOMAIN:     "5"
 TAG_SMOKE:      "6"
-TAG_SECTORS:    '{"horeca":7,"agroindustria":8,"retail":9,"servicios-profesionales":10,"agencias":11,"bpm":12,"marketplace":13}'
+TAG_SECTORS:    '{"horeca":7,"agroindustria":8,"retail":9,"servicios-profesionales":10,"agencias":11,"bpm":12,"marketplace":13,"manufactura":14}'
+TEAM_WEB:       "2"     # crm.team — name técnico 'Website' (UI español 'Sitio web')
 UTM_SOURCE_WEB: "20"
-USER_SUPER_MN:  "2"
-
-# Pendiente re-ejecución smoke tras ajustes 2.A.1:
-TEAM_WEB:                  ID del team "Sitio web"
-TAG_SECTORS.manufactura:   ID del tag "sector-manufactura"
+USER_SUPER_MN:  "2"     # res.users — colisión numérica con TEAM_WEB OK (modelos distintos)
 ```
 
+**Nota sobre la colisión numérica `TEAM_WEB=2 / USER_SUPER_MN=2`:** son IDs de modelos diferentes (`crm.team.id=2` vs `res.users.id=2`). Odoo permite IDs por-modelo sin namespace global. El Worker referencia cada uno por su modelo en el `execute_kw` correspondiente; no hay ambigüedad. Solo es nota mental al leer los secrets.
+
 **API key real:**
-- Nombre: `Landing` (única dedicada al Worker, scope CRM por permisos del super-user)
-- Vence: **2026-11-11** (180 días, no 90 — el user eligió duración default de Odoo por confort operativo)
-- Próxima rotación calendarizada: **2026-11-04** (7 días antes)
-- Almacenamiento: Bitwarden Premium (vault personal del super-user MN)
+- Nombre: `Landing` (única dedicada al Worker, scope CRM por permisos del super-user).
+- Vence: **2026-11-11** (180 días — **duración default de Odoo aceptada**, NO una decisión deliberada de extender el periodo. El spec original declaraba rotación trimestral; al crear la key Odoo presentó 180 días como opción y se aceptó por ergonomía. Revisión: ciclo Q4 2026, decidir si bajar a 90).
+- Próxima rotación calendarizada: **2026-11-04** (7 días antes del vencimiento).
+- Almacenamiento: **KeePass (KeePassXC, vault `MNC.kdbx` local)**. NO Bitwarden — el user gestiona credenciales en KeePassXC offline para reducir superficie cloud.
 
 **Acción inmediata tras este sub-lote:** el user re-corre `./tests/odoo-smoke.sh` y devuelve los 2 IDs pendientes (`TEAM_WEB` real + `TAG_SECTORS.manufactura`). Recién entonces arranca 2.B con todos los IDs en mano.
 
@@ -83,6 +82,45 @@ TAG_SECTORS.manufactura:   ID del tag "sector-manufactura"
 1. **Documentos con placeholders explícitos** (e.g. `mnaranjo` ← reemplazar con dato real) son riesgosos cuando se confunde el placeholder con el dato real. Marcar `{{ }}` o `<TODO>` en el siguiente doc.
 2. **Setup manual fuera del repo** introduce drift entre lo documentado y lo real. El smoke script captura los IDs reales y los expone — patrón correcto: "el código de verificación es la fuente de verdad, el doc es guía".
 3. **El bloqueo intencional funcionó**: detectamos las 10 diferencias en minutos, no después de horas de Worker code que asumía la versión incorrecta.
+
+---
+
+### 8.1. Odoo i18n: queries XML-RPC con nombres técnicos en inglés
+
+**Contexto (descubierto 2026-05-16):** la primera iteración del smoke script tras 2.A.1 buscaba el team con `('name', '=', 'Sitio web')` y devolvía `MISSING`. El user debugueó listando todos los teams sin filtro y descubrió que el campo `name` está almacenado en inglés en la DB; la UI traduce según idioma de sesión.
+
+Listing real recibido:
+
+```
+ID=1  active=True   name='Sales'           (UI español: "Ventas")
+ID=2  active=True   name='Website'         (UI español: "Sitio web")
+ID=3  active=False  name='Point of Sale'   (UI español: "Punto de venta")
+```
+
+**Regla aplicable a todas las queries XML-RPC desde el Worker / smoke / cualquier integración externa:**
+
+> Los modelos de sistema de Odoo (`crm.team`, `crm.stage`, etc.) almacenan `name` en INGLÉS técnico. La traducción a español/otros idiomas vive en `ir.translation` y se aplica en la UI según `res.users.lang` de sesión. **Las queries server-side deben usar el nombre técnico inglés.**
+
+**Modelos afectados conocidos (cualquiera con `name` traducible):**
+
+| Modelo | Query Worker | Nombre técnico esperado | UI español |
+|---|---|---|---|
+| `crm.team` | filtrar por team | `Website` | "Sitio web" |
+| `crm.stage` | filtrar por stage | `New`, `Qualified`, `Proposition`, `Won`, etc. | "Nuevo", "Calificado", "Propuesta", "Ganado" |
+| `res.country` | filtrar por país | `Colombia` (inglés) | "Colombia" (mismo) |
+| `res.lang` | seleccionar idioma | código (`es_CO`, `en_US`) — NO `name` traducido | n/a |
+
+**Excepción:** `utm.source` con nombres custom creados por el usuario (`Web — mnconsultoria.org`) NO se traduce — Odoo solo traduce cadenas registradas en `ir.translation`, y los datos custom se quedan literales. Por eso `UTM_SOURCE_WEB` funciona con `ilike "Web"` en cualquier idioma de sesión.
+
+**Implementación en el Worker (sub-lote 2.B):**
+
+- Hardcodear nombres técnicos en inglés para queries de modelos de sistema.
+- NO depender del idioma de sesión del API user (`info@mnconsultoria.org` tiene sesión es_CO). El `execute_kw` evalúa el filtro en el contexto del registro, no en el contexto traducido.
+- Para crear `crm.lead` con `lang: 'es_CO'` (que sí se respeta), está OK — el `lang` del lead no afecta cómo Odoo busca registros relacionados.
+
+**Acción 2.B:** documentar inline en `odoo-client.ts` cada vez que se hardcoda un nombre técnico inglés, con referencia a esta decisión #8.1.
+
+**Riesgo residual:** si en Ola 2 se contrata un developer Odoo que renombra el team "Website" → "Sitio web" en la UI (rompiendo la i18n nativa), el Worker fallaría con `TEAM_WEB: MISSING`. Mitigación: documentado en `ODOO_SETUP.md §Paso 2` explícito "NO renombrar el team en la UI".
 
 ---
 

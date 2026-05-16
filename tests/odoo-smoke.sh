@@ -147,10 +147,14 @@ tag_by_name = {t['name']: t['id'] for t in tags}
 missing_tags = [t for t in expected_tags if t not in tag_by_name]
 
 # ---- 3. Sales team ----
-# El team real en mnconsultoria.odoo.com se llama "Sitio web" (con espacio).
-# Re-uso del existente para evitar duplicación (user unico pago).
+# Odoo almacena el nombre técnico de modelos de sistema en INGLÉS y los
+# traduce en la UI según el idioma de sesión del usuario. El team que
+# en la UI español aparece como "Sitio web" tiene name='Website' en la DB.
+# Todas las queries XML-RPC desde el Worker / smoke deben usar el nombre
+# técnico en inglés. Aplica también a stage_id, country_id, lang, etc.
+# Ver MIGRATION_LOG.md decision #8.1 (Odoo i18n).
 teams = query('crm.team', 'search_read',
-              [[('name', '=', 'Sitio web')]],
+              [[('name', '=', 'Website')]],
               {'fields': ['id', 'name']})
 
 # ---- 4. UTM source ----
@@ -210,7 +214,7 @@ if missing_tags or not teams or not src_match or not users:
     if missing_tags:
         print(f"#     Tags faltantes ({len(missing_tags)}): {missing_tags} — Paso 1", file=sys.stderr)
     if not teams:
-        print(f"#     Sales team 'Sitio web' no existe — Paso 2 (re-uso existente, no crear duplicado)", file=sys.stderr)
+        print(f"#     Sales team 'Website' (UI español: 'Sitio web') no existe — Paso 2 (re-uso existente, no crear duplicado)", file=sys.stderr)
     if not src_match:
         print(f"#     UTM source 'Web — mnconsultoria.org' no existe — Paso 3", file=sys.stderr)
     if not users:

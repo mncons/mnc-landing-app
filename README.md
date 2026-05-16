@@ -107,7 +107,7 @@ Solopreneur DevSecOps mínimo para `mncons/mnc-landing-app`:
 - [x] Dependabot semanal: npm (lunes 06:00) + github-actions
       (`.github/dependabot.yml`)
 - [x] 2FA obligatorio + YubiKey 5C en cuenta `mncons` (manual)
-- [x] Bitwarden Premium para credenciales locales
+- [x] KeePassXC (vault `MNC.kdbx` local, offline) para credenciales
 - [x] Cloudflare / AWS access vía SSO + IAM Identity Center
 - [x] Conventional Commits + scope `lote-N` por sub-lote
 - [ ] TruffleHog en CI (pendiente lote 2 — sale junto con el Worker)
